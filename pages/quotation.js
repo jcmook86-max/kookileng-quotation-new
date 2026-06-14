@@ -263,17 +263,31 @@ export default function Quotation() {
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
     const el = document.querySelector('.print-area');
     if (!el) throw new Error('견적서 영역을 찾을 수 없습니다');
-    const canvas = await window.html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+    // 모바일에서도 데스크탑 폭(800px)으로 고정 캡처 → A4 폭에 꽉 차게
+    const prevW = el.style.width, prevMax = el.style.maxWidth;
+    el.style.width = '800px'; el.style.maxWidth = '800px';
+    let canvas;
+    try {
+      canvas = await window.html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff', windowWidth: 1000 });
+    } finally {
+      el.style.width = prevW; el.style.maxWidth = prevMax;
+    }
     const imgData = canvas.toDataURL('image/jpeg', 0.95);
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pageW = 210, pageH = 297;
-    const imgH = canvas.height * pageW / canvas.width;
+    const imgH = canvas.height * pageW / canvas.width;   // 항상 A4 폭에 꽉 채움
     if (imgH <= pageH) {
-      pdf.addImage(imgData, 'JPEG', 0, 0, pageW, imgH);          // 1페이지에 그대로
+      pdf.addImage(imgData, 'JPEG', 0, 0, pageW, imgH);
     } else {
-      const w = canvas.width * pageH / canvas.height;            // 넘치면 1페이지에 맞춰 축소
-      pdf.addImage(imgData, 'JPEG', (pageW - w) / 2, 0, w, pageH);
+      let heightLeft = imgH, position = 0;
+      pdf.addImage(imgData, 'JPEG', 0, position, pageW, imgH);
+      heightLeft -= pageH;
+      while (heightLeft > 0) {
+        position -= pageH; pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, position, pageW, imgH);
+        heightLeft -= pageH;
+      }
     }
     const blob = pdf.output('blob');
     return new File([blob], `견적서_${selectedModel}_${selectedKw}kW.pdf`, { type: 'application/pdf' });
