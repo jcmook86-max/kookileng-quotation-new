@@ -216,7 +216,7 @@ export default function Admin() {
 }
 
 const styles = {
-  container: { maxWidth: '1100px', margin: '0 auto', padding: '20px', fontFamily: 'Arial, sans-serif', backgroundColor: '#f9f9f9' },
+  container: { maxWidth: '1100px', margin: '0 auto', padding: '20px', fontFamily: 'Arial, sans-serif', backgroundColor: '#f9f9f9', color: '#1f2937' },
   header: { textAlign: 'center', marginBottom: '16px', padding: '24px', backgroundColor: '#2c3e50', color: 'white', borderRadius: '8px' },
   notice: { backgroundColor: '#fff8e1', border: '1px solid #ffe0a3', color: '#8a6d3b', padding: '10px 14px', borderRadius: '6px', fontSize: '13px', marginBottom: '16px', lineHeight: 1.6 },
   summaryBox: { backgroundColor: 'white', borderRadius: '8px', padding: '16px', marginBottom: '18px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)' },
@@ -242,7 +242,7 @@ const styles = {
   detailGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px', fontSize: '13px', color: '#333' },
   delBtn: { marginTop: '14px', padding: '8px 16px', fontSize: '13px', border: 'none', borderRadius: '4px', backgroundColor: '#dc3545', color: 'white', cursor: 'pointer' },
   loginWrap: { minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Arial, sans-serif' },
-  loginBox: { backgroundColor: 'white', padding: '34px', borderRadius: '10px', boxShadow: '0 4px 16px rgba(0,0,0,0.1)', width: '320px', textAlign: 'center' },
+  loginBox: { backgroundColor: 'white', padding: '34px', borderRadius: '10px', boxShadow: '0 4px 16px rgba(0,0,0,0.1)', width: '320px', textAlign: 'center', color: '#1f2937' },
   loginTitle: { margin: '0 0 8px' },
   loginDesc: { color: '#666', fontSize: '14px', marginBottom: '18px' },
   loginInput: { width: '100%', padding: '12px', fontSize: '15px', border: '1px solid #ccc', borderRadius: '6px', marginBottom: '12px', boxSizing: 'border-box' },
