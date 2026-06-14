@@ -269,13 +269,11 @@ export default function Quotation() {
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pageW = 210, pageH = 297;
     const imgH = canvas.height * pageW / canvas.width;
-    let heightLeft = imgH, position = 0;
-    pdf.addImage(imgData, 'JPEG', 0, position, pageW, imgH);
-    heightLeft -= pageH;
-    while (heightLeft > 0) {
-      position -= pageH; pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 0, position, pageW, imgH);
-      heightLeft -= pageH;
+    if (imgH <= pageH) {
+      pdf.addImage(imgData, 'JPEG', 0, 0, pageW, imgH);          // 1페이지에 그대로
+    } else {
+      const w = canvas.width * pageH / canvas.height;            // 넘치면 1페이지에 맞춰 축소
+      pdf.addImage(imgData, 'JPEG', (pageW - w) / 2, 0, w, pageH);
     }
     const blob = pdf.output('blob');
     return new File([blob], `견적서_${selectedModel}_${selectedKw}kW.pdf`, { type: 'application/pdf' });
@@ -343,6 +341,7 @@ export default function Quotation() {
           .print-area, .print-area * { visibility: visible; }
           .print-area { position: absolute; left: 0; top: 0; width: 100%; }
           .no-print { display: none !important; }
+          @page { size: A4; margin: 8mm; }
         }
       `}</style>
 
@@ -600,31 +599,31 @@ const styles = {
   mailButton: { padding: '15px 30px', fontSize: '16px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' },
   mailHint: { textAlign: 'center', fontSize: '12px', color: '#888', marginTop: '-26px', marginBottom: '40px' },
   resetButton: { padding: '15px 30px', fontSize: '16px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' },
-  sheet: { maxWidth: '820px', margin: '30px auto', backgroundColor: 'white', padding: '36px 40px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', color: '#222', fontSize: '14px' },
-  letterhead: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '3px solid #c0392b', paddingBottom: '12px' },
-  companyName: { fontSize: '22px', fontWeight: 'bold', color: '#111' },
+  sheet: { maxWidth: '820px', margin: '30px auto', backgroundColor: 'white', padding: '24px 30px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', color: '#222', fontSize: '13px' },
+  letterhead: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '3px solid #c0392b', paddingBottom: '8px' },
+  companyName: { fontSize: '19px', fontWeight: 'bold', color: '#111' },
   companyHomepage: { fontSize: '12px', color: '#777', marginTop: '4px' },
   letterRight: { textAlign: 'right', fontSize: '12px', color: '#555', lineHeight: 1.7 },
   repLine: { marginTop: '4px', fontWeight: 'bold', color: '#333' },
-  quoteTitle: { textAlign: 'center', fontSize: '28px', fontWeight: 'bold', letterSpacing: '10px', margin: '18px 0 14px', color: '#111' },
-  metaTable: { width: '100%', borderCollapse: 'collapse', marginBottom: '16px' },
+  quoteTitle: { textAlign: 'center', fontSize: '22px', fontWeight: 'bold', letterSpacing: '8px', margin: '12px 0 10px', color: '#111' },
+  metaTable: { width: '100%', borderCollapse: 'collapse', marginBottom: '10px' },
   metaTh: { border: '1px solid #d8dde2', backgroundColor: '#f4f6f8', padding: '4px 8px', textAlign: 'left', width: '72px', fontWeight: 'bold', fontSize: '11.5px', color: '#555' },
   metaTd: { border: '1px solid #d8dde2', padding: '4px 8px', fontSize: '11.5px' },
-  prodTop: { display: 'flex', gap: '26px', alignItems: 'center', margin: '6px 0 24px', flexWrap: 'wrap' },
-  prodImage: { width: '460px', maxWidth: '100%', height: 'auto', objectFit: 'contain', border: '1px solid #eee', borderRadius: '6px', backgroundColor: '#fafafa', flexShrink: 0 },
-  prodModel: { fontSize: '30px', fontWeight: 'bold' },
-  prodSpec: { fontSize: '15px', color: '#666', marginTop: '6px' },
-  prodArea: { fontSize: '14px', color: '#333', marginTop: '8px', fontWeight: 'bold' },
+  prodTop: { display: 'flex', gap: '20px', alignItems: 'center', margin: '4px 0 12px', flexWrap: 'wrap' },
+  prodImage: { width: '330px', maxWidth: '100%', height: 'auto', objectFit: 'contain', border: '1px solid #eee', borderRadius: '6px', backgroundColor: '#fafafa', flexShrink: 0 },
+  prodModel: { fontSize: '23px', fontWeight: 'bold' },
+  prodSpec: { fontSize: '14px', color: '#666', marginTop: '4px' },
+  prodArea: { fontSize: '13px', color: '#333', marginTop: '6px', fontWeight: 'bold' },
   priceTable: { width: '100%', borderCollapse: 'collapse' },
-  pTh: { border: '1px solid #ccc', backgroundColor: '#34495e', color: 'white', padding: '10px', textAlign: 'left', fontSize: '14px' },
-  pTd: { border: '1px solid #ccc', padding: '10px', fontSize: '14px' },
-  pTdR: { border: '1px solid #ccc', padding: '10px', fontSize: '14px', textAlign: 'right' },
-  pTotalTd: { border: '1px solid #ccc', padding: '12px 10px', fontSize: '16px', fontWeight: 'bold', backgroundColor: '#eaf2fb' },
-  pTotalTdR: { border: '1px solid #ccc', padding: '12px 10px', fontSize: '18px', fontWeight: 'bold', textAlign: 'right', backgroundColor: '#eaf2fb', color: '#c0392b' },
-  incBox: { marginTop: '20px', padding: '14px 18px', backgroundColor: '#f4f9f4', border: '1px solid #cfe8cf', borderRadius: '6px' },
-  incTitle: { fontWeight: 'bold', color: '#1e7e34', marginBottom: '8px', fontSize: '14px' },
+  pTh: { border: '1px solid #ccc', backgroundColor: '#34495e', color: 'white', padding: '7px 10px', textAlign: 'left', fontSize: '13px' },
+  pTd: { border: '1px solid #ccc', padding: '7px 10px', fontSize: '13px' },
+  pTdR: { border: '1px solid #ccc', padding: '7px 10px', fontSize: '13px', textAlign: 'right' },
+  pTotalTd: { border: '1px solid #ccc', padding: '9px 10px', fontSize: '15px', fontWeight: 'bold', backgroundColor: '#eaf2fb' },
+  pTotalTdR: { border: '1px solid #ccc', padding: '9px 10px', fontSize: '16px', fontWeight: 'bold', textAlign: 'right', backgroundColor: '#eaf2fb', color: '#c0392b' },
+  incBox: { marginTop: '12px', padding: '10px 14px', backgroundColor: '#f4f9f4', border: '1px solid #cfe8cf', borderRadius: '6px' },
+  incTitle: { fontWeight: 'bold', color: '#1e7e34', marginBottom: '5px', fontSize: '13px' },
   incList: { margin: 0, paddingLeft: '18px' },
-  incItem: { fontSize: '13px', color: '#333', lineHeight: 1.8 },
-  sheetNote: { fontSize: '11px', color: '#888', marginTop: '12px', lineHeight: 1.6 },
-  footer: { marginTop: '26px', borderTop: '1px solid #ddd', paddingTop: '14px', fontSize: '11px', color: '#666', lineHeight: 1.9 },
+  incItem: { fontSize: '12px', color: '#333', lineHeight: 1.45 },
+  sheetNote: { fontSize: '10px', color: '#888', marginTop: '8px', lineHeight: 1.5 },
+  footer: { marginTop: '12px', borderTop: '1px solid #ddd', paddingTop: '8px', fontSize: '10px', color: '#666', lineHeight: 1.55 },
 };
