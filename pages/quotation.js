@@ -316,7 +316,7 @@ export default function Quotation() {
       // 모바일 등 파일 공유 지원 → 메일/카톡 앱으로 PDF 첨부 공유
       if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
         setMailStatus('idle');
-        await navigator.share({ files: [pdfFile], title: subject, text: body });
+        await navigator.share({ files: [pdfFile], title: subject, text: `${subject}\n\n${body}` });
         return;
       }
       // 미지원(주로 PC) → PDF 다운로드 + 메일 본문 열기 (수동 첨부)
