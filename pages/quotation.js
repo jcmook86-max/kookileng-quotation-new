@@ -16,7 +16,7 @@ const IMG = {
 };
 
 const COMPANY = {
-  name: '㈜국일엠티에스', bizNo: '875-87-03436', tel: '031-366-5315', fax: '031-366-5316', homepage: 'www.kookilmts.co.kr',
+  name: '㈜국일엠티에스', bizNo: '875-87-03436', tel: '031-366-5315', fax: '031-366-5316', homepage: 'www.kookilmts.co.kr', address: '경기도 화성시 우정읍 버들로 787 (본사)',
   offices: [
     '본사 : 경기도 화성시 우정읍 버들로 787',
     '시흥사무소 : 경기도 시흥시 오이도로 21, SB동 205호',
@@ -142,6 +142,7 @@ export default function Quotation() {
   const [rep, setRep] = useState({ name: '', phone: '' });
   const [ocrStatus, setOcrStatus] = useState('idle');
   const [ocrText, setOcrText] = useState('');
+  const [mailStatus, setMailStatus] = useState('idle');
 
   const productObj = products.find(p => p.model === selectedModel) || null;
   const variants = productObj ? productObj.variants : [];
@@ -248,10 +249,40 @@ export default function Quotation() {
   };
 
   // 메일 보내기 (기본 메일앱 열기 + 내용 자동 채움)
-  const sendEmail = () => {
-    if (!selectedModel || !selectedType || !selectedKw) { alert('제품 / 종류 / 사양을 선택해주세요!'); return; }
-    const to = customerInfo.email || '';
-    const subject = `[견적서] ${COMPANY.name} ${selectedModel} ${selectedKw}kW`;
+  // 외부 스크립트 동적 로드 (CDN)
+  const loadScript = (url) => new Promise((resolve, reject) => {
+    if ([...document.scripts].some(s => s.src === url)) return resolve();
+    const el = document.createElement('script');
+    el.src = url; el.onload = () => resolve(); el.onerror = () => reject(new Error('스크립트 로드 실패'));
+    document.body.appendChild(el);
+  });
+
+  // 견적서(.print-area)를 PDF File 로 생성
+  const generatePdfFile = async () => {
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    const el = document.querySelector('.print-area');
+    if (!el) throw new Error('견적서 영역을 찾을 수 없습니다');
+    const canvas = await window.html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageW = 210, pageH = 297;
+    const imgH = canvas.height * pageW / canvas.width;
+    let heightLeft = imgH, position = 0;
+    pdf.addImage(imgData, 'JPEG', 0, position, pageW, imgH);
+    heightLeft -= pageH;
+    while (heightLeft > 0) {
+      position -= pageH; pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', 0, position, pageW, imgH);
+      heightLeft -= pageH;
+    }
+    const blob = pdf.output('blob');
+    return new File([blob], `견적서_${selectedModel}_${selectedKw}kW.pdf`, { type: 'application/pdf' });
+  };
+
+  // 메일 본문 (회사명·주소·전화·담당자 포함)
+  const buildMailBody = () => {
     const lines = [
       `${COMPANY.name} 견적서`,
       `견적일 : ${today}`,
@@ -260,18 +291,48 @@ export default function Quotation() {
       '',
       `제품 : ${selectedModel} (${selectedType} · ${selectedKw}kW)`,
       `작업범위 : ${productObj.area}`,
-      `제품 단가 : ₩${unitPrice.toLocaleString()}`,
-      ...selectedOptionObjs.map(o => `+ ${o.name} : ${o.price === 0 ? '별도 문의' : '₩' + o.price.toLocaleString()}`),
+      `제품 단가 : \u20a9${unitPrice.toLocaleString()}`,
+      ...selectedOptionObjs.map(o => `+ ${o.name} : ${o.price === 0 ? '별도 문의' : '\u20a9' + o.price.toLocaleString()}`),
       `수량 : ${quantity}대`,
-      `총 견적가 (부가세 별도) : ₩${total.toLocaleString()}`,
+      `총 견적가 (부가세 별도) : \u20a9${total.toLocaleString()}`,
       '',
-      rep.name || rep.phone ? `담당자 : ${rep.name || ''}${rep.phone ? ` (${rep.phone})` : ''}` : null,
-      `${COMPANY.name}  |  Tel. ${COMPANY.tel}  |  ${COMPANY.homepage}`,
-      '',
-      '※ 본 메일에 PDF 견적서를 첨부해 발송해 주세요. (먼저 "견적서 저장 및 PDF 출력"으로 PDF를 저장)',
+      '────────────────',
+      `${COMPANY.name}`,
+      `주소 : ${COMPANY.address}`,
+      `Tel. ${COMPANY.tel} / Fax. ${COMPANY.fax}`,
+      `홈페이지 : ${COMPANY.homepage}`,
+      (rep.name || rep.phone) ? `담당자 : ${rep.name || ''}${rep.phone ? ` (${rep.phone})` : ''}` : null,
     ].filter(l => l !== null && l !== undefined);
-    const body = lines.join('\n');
-    window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    return lines.join('\n');
+  };
+
+  // 메일 보내기 (PDF 생성 → 공유/첨부)
+  const sendEmail = async () => {
+    if (!selectedModel || !selectedType || !selectedKw) { alert('제품 / 종류 / 사양을 선택해주세요!'); return; }
+    const to = customerInfo.email || '';
+    const subject = `[견적서] ${COMPANY.name} ${selectedModel} ${selectedKw}kW`;
+    const body = buildMailBody();
+    setMailStatus('pdf');
+    try {
+      const pdfFile = await generatePdfFile();
+      // 모바일 등 파일 공유 지원 → 메일/카톡 앱으로 PDF 첨부 공유
+      if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+        setMailStatus('idle');
+        await navigator.share({ files: [pdfFile], title: subject, text: body });
+        return;
+      }
+      // 미지원(주로 PC) → PDF 다운로드 + 메일 본문 열기 (수동 첨부)
+      const url = URL.createObjectURL(pdfFile);
+      const a = document.createElement('a'); a.href = url; a.download = pdfFile.name; a.click();
+      URL.revokeObjectURL(url);
+      setMailStatus('idle');
+      window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body + '\n\n※ 방금 다운로드된 PDF 견적서를 메일에 첨부해 발송해 주세요.')}`;
+    } catch (err) {
+      console.error(err);
+      setMailStatus('idle');
+      alert('PDF 생성에 실패해서 본문만 메일로 엽니다. (PDF는 "견적서 저장 및 PDF 출력"으로 만들어 첨부하세요)');
+      window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    }
   };
 
   return (
@@ -491,9 +552,14 @@ export default function Quotation() {
 
       <div className="no-print" style={styles.buttonGroup}>
         <button style={styles.saveButton} onClick={saveQuotation}>💾 견적서 저장 및 PDF 출력</button>
-        <button style={styles.mailButton} onClick={sendEmail}>📧 메일 보내기</button>
+        <button style={styles.mailButton} onClick={sendEmail} disabled={mailStatus === 'pdf'}>
+          {mailStatus === 'pdf' ? '⏳ PDF 만드는 중…' : '📧 메일 보내기 (PDF 첨부)'}
+        </button>
         <button style={styles.resetButton} onClick={resetForm}>🔄 초기화</button>
       </div>
+      <p className="no-print" style={styles.mailHint}>
+        📱 휴대폰: PDF가 바로 메일·카톡에 첨부돼요. &nbsp;|&nbsp; 💻 PC: PDF가 다운로드되니 메일 창에 직접 첨부하세요.
+      </p>
     </div>
   );
 }
@@ -532,6 +598,7 @@ const styles = {
   buttonGroup: { display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '20px', marginBottom: '40px', flexWrap: 'wrap' },
   saveButton: { padding: '15px 30px', fontSize: '16px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' },
   mailButton: { padding: '15px 30px', fontSize: '16px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' },
+  mailHint: { textAlign: 'center', fontSize: '12px', color: '#888', marginTop: '-26px', marginBottom: '40px' },
   resetButton: { padding: '15px 30px', fontSize: '16px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' },
   sheet: { maxWidth: '820px', margin: '30px auto', backgroundColor: 'white', padding: '36px 40px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)', color: '#222', fontSize: '14px' },
   letterhead: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '3px solid #c0392b', paddingBottom: '12px' },
