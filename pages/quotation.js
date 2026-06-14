@@ -140,6 +140,8 @@ export default function Quotation() {
   const [options, setOptions] = useState([]);
   const [customerInfo, setCustomerInfo] = useState({ name: '', company: '', email: '', phone: '' });
   const [rep, setRep] = useState({ name: '', phone: '' });
+  const [ocrStatus, setOcrStatus] = useState('idle');
+  const [ocrText, setOcrText] = useState('');
 
   const productObj = products.find(p => p.model === selectedModel) || null;
   const variants = productObj ? productObj.variants : [];
@@ -185,10 +187,52 @@ export default function Quotation() {
     const { name, value } = e.target;
     setRep(prev => ({ ...prev, [name]: value }));
   };
+
+  // 명함 OCR (Tesseract.js, CDN 로드 — 브라우저에서 무료 동작)
+  const loadTesseract = () => new Promise((resolve, reject) => {
+    if (typeof window !== 'undefined' && window.Tesseract) return resolve(window.Tesseract);
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    s.onload = () => resolve(window.Tesseract);
+    s.onerror = () => reject(new Error('Tesseract 로드 실패'));
+    document.body.appendChild(s);
+  });
+  const parseCard = (text) => {
+    const r = {};
+    const email = text.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/);
+    if (email) r.email = email[0];
+    const mobile = text.match(/01[016789][-.\s]?\d{3,4}[-.\s]?\d{4}/);
+    const anyPhone = text.match(/0\d{1,2}[-.\s]?\d{3,4}[-.\s]?\d{4}/);
+    if (mobile) r.phone = mobile[0].replace(/\s/g, '');
+    else if (anyPhone) r.phone = anyPhone[0].replace(/\s/g, '');
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const comp = lines.find(l => /(주식회사|㈜|\(주\)|유한회사|co\.?\s*,?\s*ltd|corp|inc|company|기업|산업|건설|엔지니어링|테크|중공업)/i.test(l));
+    if (comp) r.company = comp;
+    const name = lines.find(l => /^[가-힣]{2,4}$/.test(l.replace(/\s/g, '')));
+    if (name) r.name = name.replace(/\s/g, '');
+    return r;
+  };
+  const handleCardUpload = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    setOcrStatus('loading'); setOcrText('');
+    try {
+      const T = await loadTesseract();
+      const { data: { text } } = await T.recognize(file, 'kor+eng');
+      setOcrText(text);
+      const parsed = parseCard(text);
+      setCustomerInfo(prev => ({ ...prev, ...parsed }));
+      setOcrStatus(Object.keys(parsed).length ? 'done' : 'error');
+    } catch (err) {
+      console.error(err);
+      setOcrStatus('error');
+    }
+  };
   const printQuotation = () => window.print();
   const resetForm = () => {
     setSelectedModel(null); setSelectedType(null); setSelectedKw(null);
-    setQuantity(1); setOptions([]); setCustomerInfo({ name: '', company: '', email: '', phone: '' }); setRep({ name: '', phone: '' });
+    setQuantity(1); setOptions([]); setCustomerInfo({ name: '', company: '', email: '', phone: '' }); setRep({ name: '', phone: '' }); setOcrStatus('idle'); setOcrText('');
   };
   const saveQuotation = () => {
     if (!selectedModel || !selectedType || !selectedKw) { alert('제품 / 종류 / 사양을 선택해주세요!'); return; }
@@ -196,7 +240,7 @@ export default function Quotation() {
       model: selectedModel, type: selectedType, spec: `${selectedKw}kW`, area: productObj.area,
       unitPrice: unitPrice.toLocaleString(), quantity,
       options: selectedOptionObjs.map(o => o.name), total: total.toLocaleString(),
-      customerInfo, rep, createdAt: new Date().toLocaleString('ko-KR'),
+      customerInfo, rep, createdAt: new Date().toLocaleString('ko-KR'), ts: Date.now(),
     };
     const list = JSON.parse(localStorage.getItem('quotations') || '[]');
     list.push(data); localStorage.setItem('quotations', JSON.stringify(list));
@@ -360,6 +404,16 @@ export default function Quotation() {
         {/* 고객정보 (항상 표시) */}
         <section style={styles.section}>
           <h2>👤 고객정보 <span style={styles.optionalTag}>(선택 — 입력하면 견적서에 표기됩니다)</span></h2>
+          <div style={styles.ocrBox}>
+            <label style={styles.ocrBtn}>
+              📇 고객 명함 사진으로 자동입력
+              <input type="file" accept="image/*" capture="environment" onChange={handleCardUpload} style={{ display: 'none' }} />
+            </label>
+            {ocrStatus === 'loading' && <span style={styles.ocrStatus}>인식 중… (처음엔 수십 초 걸릴 수 있어요)</span>}
+            {ocrStatus === 'done' && <span style={{ ...styles.ocrStatus, color: '#28a745' }}>✓ 인식 완료 — 아래 칸을 꼭 확인·수정하세요</span>}
+            {ocrStatus === 'error' && <span style={{ ...styles.ocrStatus, color: '#dc3545' }}>인식이 잘 안 됐어요 — 직접 입력하거나 원문을 참고하세요</span>}
+            {ocrText && <details style={styles.ocrDetails}><summary>인식된 원문 보기</summary><pre style={styles.ocrPre}>{ocrText}</pre></details>}
+          </div>
           <div style={styles.formGrid}>
             <input type="text" name="company" placeholder="업체명" value={customerInfo.company} onChange={handleCustomerInfoChange} style={styles.input} />
             <input type="text" name="name" placeholder="성명" value={customerInfo.name} onChange={handleCustomerInfoChange} style={styles.input} />
@@ -468,6 +522,11 @@ const styles = {
   optionsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px', marginTop: '12px' },
   optionLabel: { display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', backgroundColor: '#f5f5f5', borderRadius: '4px', cursor: 'pointer', fontSize: '14px' },
   optionalTag: { fontSize: '13px', fontWeight: 'normal', color: '#888' },
+  ocrBox: { marginBottom: '14px' },
+  ocrBtn: { display: 'inline-block', padding: '10px 16px', backgroundColor: '#17a2b8', color: 'white', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold' },
+  ocrStatus: { marginLeft: '12px', fontSize: '13px', color: '#555' },
+  ocrDetails: { marginTop: '10px', fontSize: '12px', color: '#666' },
+  ocrPre: { whiteSpace: 'pre-wrap', backgroundColor: '#f5f5f5', padding: '10px', borderRadius: '4px', maxHeight: '160px', overflow: 'auto' },
   formGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', marginTop: '15px' },
   input: { padding: '12px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px' },
   buttonGroup: { display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '20px', marginBottom: '40px', flexWrap: 'wrap' },
