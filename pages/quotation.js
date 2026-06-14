@@ -467,7 +467,7 @@ export default function Quotation() {
           <div style={styles.ocrBox}>
             <label style={styles.ocrBtn}>
               📇 고객 명함 사진으로 자동입력
-              <input type="file" accept="image/*" capture="environment" onChange={handleCardUpload} style={{ display: 'none' }} />
+              <input type="file" accept="image/*" onChange={handleCardUpload} style={{ display: 'none' }} />
             </label>
             {ocrStatus === 'loading' && <span style={styles.ocrStatus}>인식 중… (처음엔 수십 초 걸릴 수 있어요)</span>}
             {ocrStatus === 'done' && <span style={{ ...styles.ocrStatus, color: '#28a745' }}>✓ 인식 완료 — 아래 칸을 꼭 확인·수정하세요</span>}
